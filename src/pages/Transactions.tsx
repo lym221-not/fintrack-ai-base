@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -15,6 +15,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { Transaction, Category, TransactionType } from "@/types/finance";
 
 /* ── Category colors ── */
 const categoryColors: Record<string, { bg: string; text: string }> = {
@@ -28,23 +30,6 @@ const categoryColors: Record<string, { bg: string; text: string }> = {
   Other: { bg: "bg-gray-500", text: "text-gray-400" },
 };
 
-const allCategories = ["All", "Food", "Transport", "Shopping", "Health", "Income", "Rent", "Travel", "Other"];
-
-interface Transaction {
-  id: number;
-  amount: number;
-  category: string;
-  desc: string;
-  date: string;
-}
-
-const mockTransactions: Transaction[] = [
-  { id: 1, amount: -350, category: "Food", desc: "Lunch – MBK Food Court", date: "2026-03-18" },
-  { id: 2, amount: 125000, category: "Income", desc: "March salary", date: "2026-03-15" },
-  { id: 3, amount: -1200, category: "Transport", desc: "Grab commute", date: "2026-03-17" },
-  { id: 4, amount: -2800, category: "Shopping", desc: "Big C groceries", date: "2026-03-16" },
-];
-
 type TypeFilter = "all" | "income" | "expense";
 
 const Transactions = () => {
@@ -52,23 +37,91 @@ const Transactions = () => {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [modalOpen, setModalOpen] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   /* Modal form state */
-  const [formType, setFormType] = useState<"expense" | "income">("expense");
+  const [formType, setFormType] = useState<TransactionType>("expense");
   const [formAmount, setFormAmount] = useState("");
-  const [formCategory, setFormCategory] = useState("Food");
+  const [formCategoryId, setFormCategoryId] = useState<string>("");
   const [formDesc, setFormDesc] = useState("");
   const [formDate, setFormDate] = useState<Date | undefined>(new Date());
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // Fetch categories
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('categories')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('name');
+
+        if (categoriesError) throw categoriesError;
+        setCategories(categoriesData || []);
+
+        // If no categories exist, insert default ones
+        if (categoriesData && categoriesData.length === 0) {
+          const defaultCategories = [
+            { name: 'Food',      color: '#f97316', icon: '🍔' },
+            { name: 'Transport', color: '#60a5fa', icon: '🚗' },
+            { name: 'Shopping',  color: '#a855f7', icon: '🛍️' },
+            { name: 'Health',    color: '#f87171', icon: '❤️' },
+            { name: 'Rent',      color: '#fbbf24', icon: '🏠' },
+            { name: 'Travel',    color: '#22d3ee', icon: '✈️' },
+            { name: 'Other',     color: '#6b7280', icon: '📦' },
+          ];
+
+          const { data: inserted } = await supabase
+            .from('categories')
+            .insert(defaultCategories.map(c => ({ ...c, user_id: user.id })))
+            .select();
+
+          if (inserted) setCategories(inserted);
+        }
+
+        // Set default category if available
+        const finalCategories = categoriesData?.length > 0 ? categoriesData : (await supabase.from('categories').select('*').eq('user_id', user.id).order('name')).data || [];
+        if (finalCategories && finalCategories.length > 0) {
+          setFormCategoryId(finalCategories[0].id);
+        }
+
+        // Fetch transactions with category join
+        const { data: transactionsData, error: transactionsError } = await supabase
+          .from('transactions')
+          .select('*, categories(name, color)')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false });
+
+        if (transactionsError) throw transactionsError;
+        setTransactions(transactionsData || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   const filtered = useMemo(() => {
-    return mockTransactions.filter((tx) => {
-      if (typeFilter === "income" && tx.amount < 0) return false;
-      if (typeFilter === "expense" && tx.amount > 0) return false;
-      if (categoryFilter !== "All" && tx.category !== categoryFilter) return false;
-      if (search && !tx.desc.toLowerCase().includes(search.toLowerCase())) return false;
+    return transactions.filter((tx) => {
+      if (typeFilter === "income" && tx.type !== "income") return false;
+      if (typeFilter === "expense" && tx.type !== "expense") return false;
+      if (categoryFilter !== "All" && tx.categories?.name !== categoryFilter) return false;
+      if (search && !tx.description.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [search, typeFilter, categoryFilter]);
+  }, [search, typeFilter, categoryFilter, transactions]);
+
+  const allCategories = useMemo(() => ["All", ...categories.map(c => c.name)], [categories]);
 
   const net = filtered.reduce((s, tx) => s + tx.amount, 0);
 
@@ -81,15 +134,83 @@ const Transactions = () => {
   const resetForm = () => {
     setFormType("expense");
     setFormAmount("");
-    setFormCategory("Food");
+    setFormCategoryId(categories.length > 0 ? categories[0].id : "");
     setFormDesc("");
     setFormDate(new Date());
+  };
+
+  const handleSave = async () => {
+    if (!formAmount || !formCategoryId || !formDesc || !formDate) return;
+    
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { error } = await supabase.from('transactions').insert({
+        user_id: user.id,
+        amount: Number(formAmount),
+        type: formType,
+        category_id: formCategoryId,
+        description: formDesc,
+        date: formDate.toISOString().split('T')[0]
+      });
+
+      if (error) throw error;
+
+      // Re-fetch transactions to update UI
+      const { data: newTransactions } = await supabase
+        .from('transactions')
+        .select('*, categories(name, color)')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
+      
+      setTransactions(newTransactions || []);
+      setModalOpen(false);
+      resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save transaction');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (transaction: Transaction) => {
+    try {
+      const { error } = await supabase.from('transactions').delete().eq('id', transaction.id);
+      if (error) throw error;
+      
+      // Optimistic update
+      setTransactions(prev => prev.filter(t => t.id !== transaction.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete transaction');
+    }
   };
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 lg:p-8 max-w-[1200px]">
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="animate-pulse bg-muted rounded-xl h-14" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 lg:p-8 max-w-[1200px]">
+        <div className="text-expense text-center">{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 lg:p-8 max-w-[1200px]">
@@ -145,13 +266,13 @@ const Transactions = () => {
             {/* Category */}
             <div>
               <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">Category</label>
-              <Select value={formCategory} onValueChange={setFormCategory}>
+              <Select value={formCategoryId} onValueChange={setFormCategoryId}>
                 <SelectTrigger className="bg-muted border-border text-foreground">
-                  <SelectValue />
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
-                  {allCategories.filter((c) => c !== "All").map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -181,8 +302,12 @@ const Transactions = () => {
                 </PopoverContent>
               </Popover>
             </div>
-            <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-2" onClick={() => setModalOpen(false)}>
-              Save Transaction
+            <Button 
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-2" 
+              onClick={handleSave}
+              disabled={saving || !formAmount || !formCategoryId || !formDesc || !formDate}
+            >
+              {saving ? "Saving…" : "Save Transaction"}
             </Button>
           </DialogContent>
         </Dialog>
@@ -243,6 +368,9 @@ const Transactions = () => {
       </div>
 
       {/* Transaction list */}
+      {error && (
+        <div className="text-expense text-center mb-4">{error}</div>
+      )}
       <div className="rounded-xl border border-border bg-card">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
@@ -251,8 +379,9 @@ const Transactions = () => {
         ) : (
           <div className="divide-y divide-border">
             {filtered.map((tx) => {
-              const meta = categoryColors[tx.category] ?? categoryColors.Other;
-              const isIncome = tx.amount > 0;
+              const categoryName = tx.categories?.name || "Other";
+              const meta = categoryColors[categoryName] || categoryColors.Other;
+              const isIncome = tx.type === "income";
               return (
                 <div
                   key={tx.id}
@@ -260,13 +389,13 @@ const Transactions = () => {
                 >
                   {/* Category square */}
                   <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white", meta.bg)}>
-                    {tx.category[0]}
+                    {categoryName[0]}
                   </div>
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{tx.desc}</p>
+                    <p className="text-sm font-semibold text-foreground truncate">{tx.description}</p>
                     <p className="text-[11px]">
-                      <span className={meta.text}>{tx.category}</span>
+                      <span className={meta.text}>{categoryName}</span>
                       <span className="text-muted-foreground"> · </span>
                       <span className="font-mono-dm text-muted-foreground">{formatDate(tx.date)}</span>
                     </p>
@@ -280,7 +409,10 @@ const Transactions = () => {
                       <button className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
-                      <button className="rounded p-1.5 text-muted-foreground hover:text-expense hover:bg-muted">
+                      <button 
+                        className="rounded p-1.5 text-muted-foreground hover:text-expense hover:bg-muted"
+                        onClick={() => handleDelete(tx)}
+                      >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>

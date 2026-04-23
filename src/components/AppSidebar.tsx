@@ -1,6 +1,9 @@
-import { DollarSign, LayoutDashboard, ArrowLeftRight, BarChart3, Settings, Send } from "lucide-react";
+import { DollarSign, LayoutDashboard, ArrowLeftRight, BarChart3, Settings, Send, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { User } from "@supabase/supabase-js";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -11,6 +14,24 @@ const navItems = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const userEmail = user?.email ?? "...";
+  const userInitial = userEmail[0]?.toUpperCase() ?? "?";
 
   const isActive = (url: string) => {
     if (url === "/") return location.pathname === "/";
@@ -66,12 +87,18 @@ export function AppSidebar() {
       {/* User Profile */}
       <div className="flex items-center gap-3 border-t border-border px-4 py-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
-          JD
+          {userInitial}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="truncate text-sm text-foreground">john@example.com</p>
-          <p className="text-xs text-muted-foreground">Pro Plan</p>
+          <p className="truncate text-sm text-foreground">{userEmail}</p>
         </div>
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="ml-auto flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          title="Sign out"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+        </button>
       </div>
     </aside>
   );
