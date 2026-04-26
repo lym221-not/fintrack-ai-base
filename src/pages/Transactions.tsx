@@ -1,5 +1,16 @@
+<<<<<<< HEAD
 import { useState, useMemo } from "react";
 import { Plus, Search, Pencil, Trash2, CalendarIcon } from "lucide-react";
+=======
+import { useState, useMemo, useEffect } from "react";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+<<<<<<< HEAD
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
 import { 
@@ -19,6 +31,11 @@ import {
   useTransactionsQuery,
   useCategoriesQuery
 } from "@/hooks/useTransactions";
+=======
+import { CalendarIcon } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { Transaction, Category, TransactionType } from "@/types/finance";
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
 
 const categoryColors: Record<string, { bg: string; text: string }> = {
   Food: { bg: "bg-orange-500", text: "text-orange-400" },
@@ -38,6 +55,7 @@ const Transactions = () => {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [modalOpen, setModalOpen] = useState(false);
+<<<<<<< HEAD
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Queries
@@ -90,6 +108,93 @@ const Transactions = () => {
     });
     setEditingId(null);
   };
+=======
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  /* Modal form state */
+  const [formType, setFormType] = useState<TransactionType>("expense");
+  const [formAmount, setFormAmount] = useState("");
+  const [formCategoryId, setFormCategoryId] = useState<string>("");
+  const [formDesc, setFormDesc] = useState("");
+  const [formDate, setFormDate] = useState<Date | undefined>(new Date());
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // Fetch categories
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('categories')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('name');
+
+        if (categoriesError) throw categoriesError;
+        setCategories(categoriesData || []);
+
+        // If no categories exist, insert default ones
+        if (categoriesData && categoriesData.length === 0) {
+          const defaultCategories = [
+            { name: 'Food',      color: '#f97316', icon: '🍔' },
+            { name: 'Transport', color: '#60a5fa', icon: '🚗' },
+            { name: 'Shopping',  color: '#a855f7', icon: '🛍️' },
+            { name: 'Health',    color: '#f87171', icon: '❤️' },
+            { name: 'Rent',      color: '#fbbf24', icon: '🏠' },
+            { name: 'Travel',    color: '#22d3ee', icon: '✈️' },
+            { name: 'Other',     color: '#6b7280', icon: '📦' },
+          ];
+
+          const { data: inserted } = await supabase
+            .from('categories')
+            .insert(defaultCategories.map(c => ({ ...c, user_id: user.id })))
+            .select();
+
+          if (inserted) setCategories(inserted);
+        }
+
+        // Set default category if available
+        const finalCategories = categoriesData?.length > 0 ? categoriesData : (await supabase.from('categories').select('*').eq('user_id', user.id).order('name')).data || [];
+        if (finalCategories && finalCategories.length > 0) {
+          setFormCategoryId(finalCategories[0].id);
+        }
+
+        // Fetch transactions with category join
+        const { data: transactionsData, error: transactionsError } = await supabase
+          .from('transactions')
+          .select('*, categories(name, color)')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false });
+
+        if (transactionsError) throw transactionsError;
+        setTransactions(transactionsData || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const filtered = useMemo(() => {
+    return transactions.filter((tx) => {
+      if (typeFilter === "income" && tx.type !== "income") return false;
+      if (typeFilter === "expense" && tx.type !== "expense") return false;
+      if (categoryFilter !== "All" && tx.categories?.name !== categoryFilter) return false;
+      if (search && !tx.description.toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    });
+  }, [search, typeFilter, categoryFilter, transactions]);
+
+  const allCategories = useMemo(() => ["All", ...categories.map(c => c.name)], [categories]);
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
 
   const handleEdit = (tx: any) => {
     setEditingId(tx.id);
@@ -143,12 +248,75 @@ const Transactions = () => {
     { label: "Expense", value: "expense" },
   ];
 
+<<<<<<< HEAD
+=======
+  const resetForm = () => {
+    setFormType("expense");
+    setFormAmount("");
+    setFormCategoryId(categories.length > 0 ? categories[0].id : "");
+    setFormDesc("");
+    setFormDate(new Date());
+  };
+
+  const handleSave = async () => {
+    if (!formAmount || !formCategoryId || !formDesc || !formDate) return;
+    
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { error } = await supabase.from('transactions').insert({
+        user_id: user.id,
+        amount: Number(formAmount),
+        type: formType,
+        category_id: formCategoryId,
+        description: formDesc,
+        date: formDate.toISOString().split('T')[0]
+      });
+
+      if (error) throw error;
+
+      // Re-fetch transactions to update UI
+      const { data: newTransactions } = await supabase
+        .from('transactions')
+        .select('*, categories(name, color)')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
+      
+      setTransactions(newTransactions || []);
+      setModalOpen(false);
+      resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save transaction');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (transaction: Transaction) => {
+    try {
+      const { error } = await supabase.from('transactions').delete().eq('id', transaction.id);
+      if (error) throw error;
+      
+      // Optimistic update
+      setTransactions(prev => prev.filter(t => t.id !== transaction.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete transaction');
+    }
+  };
+
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
+<<<<<<< HEAD
   if (isLoading) {
+=======
+  if (loading) {
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
     return (
       <div className="p-6 lg:p-8 max-w-[1200px]">
         <div className="space-y-4">
@@ -160,6 +328,17 @@ const Transactions = () => {
     );
   }
 
+<<<<<<< HEAD
+=======
+  if (error) {
+    return (
+      <div className="p-6 lg:p-8 max-w-[1200px]">
+        <div className="text-expense text-center">{error}</div>
+      </div>
+    );
+  }
+
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
   return (
     <div className="p-6 lg:p-8 max-w-[1200px]">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
@@ -169,6 +348,7 @@ const Transactions = () => {
           </p>
           <h1 className="font-display text-3xl text-foreground">Transactions</h1>
         </div>
+<<<<<<< HEAD
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportCSV}>
             Export CSV
@@ -323,6 +503,99 @@ const Transactions = () => {
             </DialogContent>
           </Dialog>
         </div>
+=======
+        <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
+              <Plus className="h-4 w-4" />
+              Add Transaction
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="bg-card border-border sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-display text-xl text-foreground">New Transaction</DialogTitle>
+            </DialogHeader>
+            {/* Type toggle */}
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              <button
+                onClick={() => setFormType("expense")}
+                className={cn(
+                  "flex-1 py-2.5 text-sm font-medium transition-colors",
+                  formType === "expense" ? "bg-expense/15 text-expense" : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                Expense
+              </button>
+              <button
+                onClick={() => setFormType("income")}
+                className={cn(
+                  "flex-1 py-2.5 text-sm font-medium transition-colors",
+                  formType === "income" ? "bg-income/15 text-income" : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                Income
+              </button>
+            </div>
+            {/* Amount */}
+            <div>
+              <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">Amount (THB)</label>
+              <Input
+                type="number"
+                placeholder="0"
+                value={formAmount}
+                onChange={(e) => setFormAmount(e.target.value)}
+                className="font-mono-dm text-2xl h-14 bg-muted border-border text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+            {/* Category */}
+            <div>
+              <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">Category</label>
+              <Select value={formCategoryId} onValueChange={setFormCategoryId}>
+                <SelectTrigger className="bg-muted border-border text-foreground">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border">
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Description */}
+            <div>
+              <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">Description</label>
+              <Input
+                placeholder="What was this for?"
+                value={formDesc}
+                onChange={(e) => setFormDesc(e.target.value)}
+                className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+            {/* Date */}
+            <div>
+              <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-1.5 block">Date</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal bg-muted border-border", !formDate && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formDate ? format(formDate, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-card border-border" align="start">
+                  <Calendar mode="single" selected={formDate} onSelect={setFormDate} initialFocus className={cn("p-3 pointer-events-auto")} />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <Button 
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-2" 
+              onClick={handleSave}
+              disabled={saving || !formAmount || !formCategoryId || !formDesc || !formDate}
+            >
+              {saving ? "Saving…" : "Save Transaction"}
+            </Button>
+          </DialogContent>
+        </Dialog>
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
       </div>
 
       <div className="rounded-xl border border-border bg-card p-4 mb-4">
@@ -374,6 +647,13 @@ const Transactions = () => {
         </span>
       </div>
 
+<<<<<<< HEAD
+=======
+      {/* Transaction list */}
+      {error && (
+        <div className="text-expense text-center mb-4">{error}</div>
+      )}
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
       <div className="rounded-xl border border-border bg-card">
         {transactions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
@@ -381,7 +661,11 @@ const Transactions = () => {
           </div>
         ) : (
           <div className="divide-y divide-border">
+<<<<<<< HEAD
             {transactions.map((tx) => {
+=======
+            {filtered.map((tx) => {
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
               const categoryName = tx.categories?.name || "Other";
               const meta = categoryColors[categoryName] || categoryColors.Other;
               const isIncome = tx.type === "income";
@@ -394,6 +678,7 @@ const Transactions = () => {
                     {categoryName[0]}
                   </div>
                   <div className="flex-1 min-w-0">
+<<<<<<< HEAD
                     <p className="text-sm font-semibold text-foreground truncate flex items-center gap-2">
                       {tx.description}
                       {tx.recurrence && tx.recurrence !== 'none' && (
@@ -402,6 +687,9 @@ const Transactions = () => {
                         </span>
                       )}
                     </p>
+=======
+                    <p className="text-sm font-semibold text-foreground truncate">{tx.description}</p>
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
                     <p className="text-[11px]">
                       <span className={meta.text}>{categoryName}</span>
                       <span className="text-muted-foreground"> · </span>
@@ -421,7 +709,11 @@ const Transactions = () => {
                       </button>
                       <button 
                         className="rounded p-1.5 text-muted-foreground hover:text-expense hover:bg-muted"
+<<<<<<< HEAD
                         onClick={() => handleDelete(tx.id)}
+=======
+                        onClick={() => handleDelete(tx)}
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

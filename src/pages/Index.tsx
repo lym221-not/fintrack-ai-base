@@ -16,9 +16,16 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+<<<<<<< HEAD
 import { useDashboardStats } from "@/hooks/useDashboard";
 import { useToast } from "@/hooks/use-toast";
 
+=======
+import { supabase } from "@/lib/supabase";
+import { Transaction, Budget } from "@/types/finance";
+
+/* ── Category Meta ── */
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
 const categoryMeta: Record<string, { icon: React.ElementType; bg: string; text: string }> = {
   Food: { icon: UtensilsCrossed, bg: "bg-orange-500/20", text: "text-orange-400" },
   Income: { icon: Briefcase, bg: "bg-primary/20", text: "text-primary" },
@@ -38,6 +45,7 @@ function budgetBarColor(spent: number, limit: number) {
 }
 
 const Index = () => {
+<<<<<<< HEAD
   const currentDate = new Date();
   const [currentMonth] = useState(currentDate.getMonth() + 1);
   const [currentYear] = useState(currentDate.getFullYear());
@@ -64,40 +72,131 @@ const Index = () => {
       }
     });
   }, [data?.budgets, toast]);
+=======
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [loading, setLoading] = useState(true);
+  const currentDate = new Date();
+  const [currentMonth, setCurrentMonth] = useState(currentDate.getMonth() + 1);
+  const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // Fetch this month's transactions
+        const monthStart = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+        const monthEnd = `${currentYear}-${String(currentMonth).padStart(2, '0')}-31`;
+        
+        const { data: transactionsData, error: transactionsError } = await supabase
+          .from('transactions')
+          .select('*, categories(name, color)')
+          .eq('user_id', user.id)
+          .gte('date', monthStart)
+          .lte('date', monthEnd)
+          .order('date', { ascending: false });
+
+        if (transactionsError) throw transactionsError;
+        setTransactions(transactionsData || []);
+
+        // Fetch this month's budgets
+        const { data: budgetsData, error: budgetsError } = await supabase
+          .from('budgets')
+          .select('*, categories(name)')
+          .eq('user_id', user.id)
+          .eq('month', currentMonth)
+          .eq('year', currentYear);
+
+        if (budgetsError) throw budgetsError;
+        setBudgets(budgetsData || []);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [currentMonth, currentYear]);
+
+  // Derive stats from fetched transactions
+  const totalIncome = transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+  
+  const totalExpenses = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+  
+  const balance = totalIncome - totalExpenses;
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
 
   const stats = [
     { 
       label: "Current Balance", 
+<<<<<<< HEAD
       value: data?.totalBalance?.toLocaleString() ?? "0", 
       trend: "+0.0%", 
       positive: (data?.totalBalance ?? 0) >= 0, 
+=======
+      value: balance.toLocaleString(), 
+      trend: "+12.4%", 
+      positive: balance >= 0, 
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
       accent: true, 
       icon: Wallet 
     },
     { 
       label: "Total Income", 
+<<<<<<< HEAD
       value: data?.totalIncome?.toLocaleString() ?? "0", 
       trend: "+0.0%", 
+=======
+      value: totalIncome.toLocaleString(), 
+      trend: "+8.2%", 
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
       positive: true, 
       accent: false, 
       icon: TrendingUp 
     },
     { 
       label: "Total Expenses", 
+<<<<<<< HEAD
       value: data?.totalExpenses?.toLocaleString() ?? "0", 
       trend: "-0.0%", 
+=======
+      value: totalExpenses.toLocaleString(), 
+      trend: "-3.1%", 
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
       positive: false, 
       accent: false, 
       icon: TrendingDown 
     },
   ];
 
+<<<<<<< HEAD
+=======
+  // Derive budget spent amounts
+  const budgetsWithSpent = budgets.map(budget => ({
+    ...budget,
+    spent: transactions
+      .filter(t => t.category_id === budget.category_id && t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0)
+  }));
+
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
   const currentMonthLabel = new Date(currentYear, currentMonth - 1).toLocaleString('default', { 
     month: 'long', 
     year: 'numeric' 
   });
 
+<<<<<<< HEAD
   if (isLoading) {
+=======
+  if (loading) {
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
     return (
       <div className="p-6 lg:p-8 max-w-[1200px]">
         {/* Header skeleton */}
@@ -142,7 +241,10 @@ const Index = () => {
       </div>
     );
   }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
   return (
     <div className="p-6 lg:p-8 max-w-[1200px]">
       <p className="font-mono-dm text-[11px] uppercase tracking-[0.2em] text-primary mb-1">
@@ -191,7 +293,11 @@ const Index = () => {
         <div className="xl:col-span-3 rounded-xl border border-border bg-card p-5">
           <h2 className="font-display text-lg text-foreground mb-4">Recent Transactions</h2>
           <div className="space-y-1">
+<<<<<<< HEAD
             {data?.recentTransactions?.map((tx: any) => {
+=======
+            {transactions.slice(0, 5).map((tx, i) => {
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
               const categoryName = tx.categories?.name || "Other";
               const meta = categoryMeta[categoryName] ?? categoryMeta["Other"];
               const Icon = meta.icon;
@@ -240,9 +346,15 @@ const Index = () => {
         <div className="xl:col-span-2 rounded-xl border border-border bg-card p-5">
           <h2 className="font-display text-lg text-foreground mb-4">Budgets</h2>
           <div className="space-y-4">
+<<<<<<< HEAD
             {data?.budgets?.map((budget: any) => {
               const pct = Math.min((budget.spent / budget.limit_amount) * 100, 100);
               const over = budget.spent >= budget.limit_amount;
+=======
+            {budgetsWithSpent.map((budget) => {
+              const pct = Math.min((budget.spent / budget.limit_amount) * 100, 100);
+              const over = budget.spent > budget.limit_amount;
+>>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
               const categoryName = budget.categories?.name || "Unknown";
               return (
                 <div key={budget.id}>
