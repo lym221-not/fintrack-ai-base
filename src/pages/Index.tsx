@@ -15,13 +15,9 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-
-/* ── Mock Data ── */
-const stats = [
-  { label: "Current Balance", value: "82,450", trend: "+12.4%", positive: true, accent: true, icon: Wallet },
-  { label: "Total Income", value: "125,000", trend: "+8.2%", positive: true, accent: false, icon: TrendingUp },
-  { label: "Total Expenses", value: "42,550", trend: "-3.1%", positive: false, accent: false, icon: TrendingDown },
-];
+import { useState, useEffect } from "react";
+import { useDashboardStats } from "@/hooks/useDashboard";
+import { useToast } from "@/hooks/use-toast";
 
 const categoryMeta: Record<string, { icon: React.ElementType; bg: string; text: string }> = {
   Food: { icon: UtensilsCrossed, bg: "bg-orange-500/20", text: "text-orange-400" },
@@ -29,39 +25,131 @@ const categoryMeta: Record<string, { icon: React.ElementType; bg: string; text: 
   Transport: { icon: Car, bg: "bg-blue/20", text: "text-blue" },
   Shopping: { icon: ShoppingBag, bg: "bg-purple-500/20", text: "text-purple-400" },
   Health: { icon: Heart, bg: "bg-rose-500/20", text: "text-rose-400" },
+  Rent:  { icon: Briefcase, bg: "bg-yellow-500/20", text: "text-yellow-400" },
+  Travel: { icon: Car, bg: "bg-cyan-500/20", text: "text-cyan-400" },
+  Other: { icon: Wallet, bg: "bg-muted", text: "text-muted-foreground" },
 };
-
-const transactions = [
-  { amount: -350, category: "Food", desc: "Lunch – MBK Food Court", date: "Mar 18" },
-  { amount: 125000, category: "Income", desc: "March salary", date: "Mar 15" },
-  { amount: -1200, category: "Transport", desc: "Grab commute", date: "Mar 17" },
-  { amount: -2800, category: "Shopping", desc: "Big C groceries", date: "Mar 16" },
-];
-
-const budgets = [
-  { category: "Food", spent: 3200, limit: 5000 },
-  { category: "Transport", spent: 2100, limit: 2500 },
-  { category: "Shopping", spent: 4800, limit: 4000 },
-  { category: "Health", spent: 500, limit: 3000 },
-];
 
 function budgetBarColor(spent: number, limit: number) {
   const ratio = spent / limit;
-  if (ratio > 1) return "bg-expense";
-  if (ratio > 0.75) return "bg-amber";
+  if (ratio >= 1) return "bg-expense";
+  if (ratio >= 0.8) return "bg-amber";
   return "bg-primary";
 }
 
 const Index = () => {
+  const currentDate = new Date();
+  const [currentMonth] = useState(currentDate.getMonth() + 1);
+  const [currentYear] = useState(currentDate.getFullYear());
+  const { toast } = useToast();
+
+  const { data, isLoading } = useDashboardStats(currentMonth, currentYear);
+
+  useEffect(() => {
+    if (!data?.budgets) return;
+
+    data.budgets.forEach(budget => {
+      const pct = (budget.spent / budget.limit_amount) * 100;
+      if (budget.spent >= budget.limit_amount) {
+        toast({
+          title: 'Budget Exceeded',
+          description: `You've exceeded your ${budget.categories?.name} budget!`,
+          variant: 'destructive',
+        });
+      } else if (pct >= 80) {
+        toast({
+          title: 'Budget Warning',
+          description: `You're at ${Math.round(pct)}% of your ${budget.categories?.name} budget.`,
+        });
+      }
+    });
+  }, [data?.budgets, toast]);
+
+  const stats = [
+    { 
+      label: "Current Balance", 
+      value: data?.totalBalance?.toLocaleString() ?? "0", 
+      trend: "+0.0%", 
+      positive: (data?.totalBalance ?? 0) >= 0, 
+      accent: true, 
+      icon: Wallet 
+    },
+    { 
+      label: "Total Income", 
+      value: data?.totalIncome?.toLocaleString() ?? "0", 
+      trend: "+0.0%", 
+      positive: true, 
+      accent: false, 
+      icon: TrendingUp 
+    },
+    { 
+      label: "Total Expenses", 
+      value: data?.totalExpenses?.toLocaleString() ?? "0", 
+      trend: "-0.0%", 
+      positive: false, 
+      accent: false, 
+      icon: TrendingDown 
+    },
+  ];
+
+  const currentMonthLabel = new Date(currentYear, currentMonth - 1).toLocaleString('default', { 
+    month: 'long', 
+    year: 'numeric' 
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-6 lg:p-8 max-w-[1200px]">
+        {/* Header skeleton */}
+        <div className="mb-8">
+          <div className="animate-pulse bg-muted rounded w-32 h-4 mb-2" />
+          <div className="animate-pulse bg-muted rounded w-48 h-8" />
+        </div>
+        
+        {/* Stats skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="animate-pulse bg-card border border-border rounded-xl p-5">
+              <div className="bg-muted rounded w-24 h-4 mb-3" />
+              <div className="bg-muted rounded w-32 h-8 mb-2" />
+              <div className="bg-muted rounded w-20 h-4" />
+            </div>
+          ))}
+        </div>
+        
+        {/* Content skeleton */}
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 mb-8">
+          <div className="xl:col-span-3 animate-pulse bg-card border border-border rounded-xl p-5">
+            <div className="bg-muted rounded w-32 h-6 mb-4" />
+            <div className="space-y-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-muted rounded h-12" />
+              ))}
+            </div>
+          </div>
+          <div className="xl:col-span-2 animate-pulse bg-card border border-border rounded-xl p-5">
+            <div className="bg-muted rounded w-20 h-6 mb-4" />
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i}>
+                  <div className="bg-muted rounded w-full h-2 mb-1" />
+                  <div className="bg-muted rounded w-16 h-3" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 lg:p-8 max-w-[1200px]">
-      {/* Header */}
       <p className="font-mono-dm text-[11px] uppercase tracking-[0.2em] text-primary mb-1">
-        March 2026
+        {currentMonthLabel}
       </p>
       <h1 className="font-display text-3xl text-foreground mb-8">Overview</h1>
 
-      {/* Section 1 — Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {stats.map((s) => (
           <div
@@ -99,28 +187,31 @@ const Index = () => {
         ))}
       </div>
 
-      {/* Section 2 — Two columns */}
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 mb-8">
-        {/* Recent Transactions */}
         <div className="xl:col-span-3 rounded-xl border border-border bg-card p-5">
           <h2 className="font-display text-lg text-foreground mb-4">Recent Transactions</h2>
           <div className="space-y-1">
-            {transactions.map((tx, i) => {
-              const meta = categoryMeta[tx.category];
+            {data?.recentTransactions?.map((tx: any) => {
+              const categoryName = tx.categories?.name || "Other";
+              const meta = categoryMeta[categoryName] ?? categoryMeta["Other"];
               const Icon = meta.icon;
-              const isIncome = tx.amount > 0;
+              const isIncome = tx.type === 'income';
+              const formattedDate = new Date(tx.date).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric' 
+              });
               return (
                 <div
-                  key={i}
+                  key={tx.id}
                   className="group flex items-center gap-3 rounded-lg px-3 py-2.5 -mx-3 transition-colors hover:bg-muted/50"
                 >
                   <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${meta.bg}`}>
                     <Icon className={`h-4 w-4 ${meta.text}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground truncate">{tx.desc}</p>
+                    <p className="text-sm text-foreground truncate">{tx.description}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {tx.category} · {tx.date}
+                      {categoryName} · {formattedDate}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -130,18 +221,13 @@ const Index = () => {
                       {isIncome ? "+" : "-"}
                       {Math.abs(tx.amount).toLocaleString()}
                     </span>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted">
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                      <button className="rounded p-1 text-muted-foreground hover:text-expense hover:bg-muted">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
                   </div>
                 </div>
               );
             })}
+            {(!data?.recentTransactions || data.recentTransactions.length === 0) && (
+              <p className="text-sm text-muted-foreground py-4 text-center">No recent transactions</p>
+            )}
           </div>
           <Link
             to="/transactions"
@@ -151,36 +237,39 @@ const Index = () => {
           </Link>
         </div>
 
-        {/* Budgets */}
         <div className="xl:col-span-2 rounded-xl border border-border bg-card p-5">
           <h2 className="font-display text-lg text-foreground mb-4">Budgets</h2>
           <div className="space-y-4">
-            {budgets.map((b) => {
-              const pct = Math.min((b.spent / b.limit) * 100, 100);
-              const over = b.spent > b.limit;
+            {data?.budgets?.map((budget: any) => {
+              const pct = Math.min((budget.spent / budget.limit_amount) * 100, 100);
+              const over = budget.spent >= budget.limit_amount;
+              const categoryName = budget.categories?.name || "Unknown";
               return (
-                <div key={b.category}>
+                <div key={budget.id}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm text-foreground">{b.category}</span>
+                    <span className="text-sm text-foreground">{categoryName}</span>
                     <span className="font-mono-dm text-xs text-muted-foreground">
-                      {b.spent.toLocaleString()}{" "}
-                      <span className="text-muted-foreground/60">/ {b.limit.toLocaleString()} THB</span>
+                      {budget.spent.toLocaleString()}{" "}
+                      <span className="text-muted-foreground/60">/ {budget.limit_amount.toLocaleString()} THB</span>
                     </span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-muted">
                     <div
-                      className={`h-full rounded-full transition-all ${budgetBarColor(b.spent, b.limit)}`}
+                      className={`h-full rounded-full transition-all ${budgetBarColor(budget.spent, budget.limit_amount)}`}
                       style={{ width: `${over ? 100 : pct}%` }}
                     />
                   </div>
                   {over && (
                     <p className="mt-1 text-[10px] font-medium text-expense">
-                      Over budget by {(b.spent - b.limit).toLocaleString()} THB
+                      Over budget by {(budget.spent - budget.limit_amount).toLocaleString()} THB
                     </p>
                   )}
                 </div>
               );
             })}
+            {(!data?.budgets || data.budgets.length === 0) && (
+              <p className="text-sm text-muted-foreground">No budgets set for this month</p>
+            )}
           </div>
           <Link
             to="/settings"
@@ -191,7 +280,6 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Section 3 — Telegram CTA */}
       <div className="rounded-xl border border-blue/20 bg-blue/5 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue/20">
           <Send className="h-5 w-5 text-blue" />
