@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { DollarSign, LayoutDashboard, ArrowLeftRight, BarChart3, Settings, Send, LogOut, Moon } from "lucide-react";
-=======
-import { DollarSign, LayoutDashboard, ArrowLeftRight, BarChart3, Settings, Send, LogOut } from "lucide-react";
->>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -105,7 +101,6 @@ export function AppSidebar() {
           <p className="truncate text-sm text-foreground">{userEmail}</p>
         </div>
         <button
-<<<<<<< HEAD
           onClick={toggleDarkMode}
           className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           title="Toggle Dark Mode"
@@ -115,10 +110,6 @@ export function AppSidebar() {
         <button
           onClick={() => supabase.auth.signOut()}
           className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-=======
-          onClick={() => supabase.auth.signOut()}
-          className="ml-auto flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
->>>>>>> 357fedc7adf103e8cd91392693ff036becb71690
           title="Sign out"
         >
           <LogOut className="h-3.5 w-3.5" />
