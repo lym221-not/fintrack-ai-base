@@ -50,9 +50,7 @@ export function AppSidebar() {
     <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-card border-r border-border">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-          <DollarSign className="h-5 w-5 text-primary-foreground" />
-        </div>
+        <img src="/logo.png" alt="FinTrack AI Logo" className="h-10 w-10 object-contain rounded-lg" />
         <div>
           <h1 className="font-display text-lg leading-tight text-foreground">FinTrack</h1>
           <span className="font-mono-dm text-xs text-primary">AI Edition</span>
