@@ -19,10 +19,10 @@ FinTrack AI Base is a modern, full-stack financial tracking application designed
 - **Authentication:** Secure user signup and login powered by Supabase Auth.
 - **Dashboard:** At-a-glance overview of financial health, including total balance, recent transactions, and spending summaries.
 - **Transaction Tracking:** Detailed management of income and expenses with support for categories, dates, and descriptions.
-- **Budgeting:** Category-specific budget limits to help users stay within their financial goals.
+- **Budgets:** Comprehensive category-specific budget limits to help users stay within their financial goals. Features include total budget summaries, progress bars, inline editing, and a month navigator to browse and plan past/future months.
 - **Reporting:** Visual data representation using various chart types to analyze spending patterns and income trends.
 - **Responsive Design:** Fully optimized for both desktop and mobile devices using a mobile-first approach.
-- **Theme Support:** Modern UI with consistent spacing and typography.
+- **Theme Support:** Modern UI with consistent spacing and typography, including global Dark Mode.
 
 ## Project Structure
 - `src/components/`: Modular UI components.
@@ -30,8 +30,9 @@ FinTrack AI Base is a modern, full-stack financial tracking application designed
     - `AppLayout.tsx`: The main shell of the application including sidebar and navigation.
     - `AuthGuard.tsx`: Protection for private routes.
 - `src/pages/`: Main application views.
-    - `Index.tsx`: The primary dashboard.
+    - `Index.tsx`: The primary dashboard with active budget insights.
     - `Transactions.tsx`: List and management of all financial records.
+    - `Budgets.tsx`: Dedicated budget tracking and monthly planning interface.
     - `Reports.tsx`: Data visualization and financial analysis.
     - `Settings.tsx`: User preferences and account management.
     - `Login.tsx` & `Signup.tsx`: Authentication flows.
@@ -40,7 +41,7 @@ FinTrack AI Base is a modern, full-stack financial tracking application designed
     - `utils.ts`: Tailwind CSS class merging and other utilities.
 - `src/types/`: TypeScript definitions.
     - `finance.ts`: Interfaces for Transactions, Categories, and Budgets.
-- `src/hooks/`: Custom React hooks for shared logic (e.g., mobile detection, toast notifications).
+- `src/hooks/`: Custom React hooks for shared logic (e.g., `useDashboard.ts` fetching transactions and categories).
 - `src/test/`: Configuration and examples for the testing suite.
 
 ## Getting Started

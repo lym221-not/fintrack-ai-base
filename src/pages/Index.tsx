@@ -13,11 +13,14 @@ import {
   Trash2,
   Send,
   ArrowRight,
+  PiggyBank,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useDashboardStats } from "@/hooks/useDashboard";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 
 /* ── Category Meta ── */
 const categoryMeta: Record<string, { icon: React.ElementType; bg: string; text: string }> = {
@@ -43,6 +46,37 @@ const Index = () => {
   const [currentMonth] = useState(currentDate.getMonth() + 1);
   const [currentYear] = useState(currentDate.getFullYear());
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [budgetInputs, setBudgetInputs] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const upsertBudget = useMutation({
+    mutationFn: async ({ category_id, limit_amount }: { category_id: string; limit_amount: number }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('budgets').upsert(
+        { user_id: user!.id, category_id, limit_amount, month: currentMonth, year: currentYear },
+        { onConflict: 'user_id,category_id,month,year' }
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      toast({ title: 'Budget saved!' });
+    },
+    onError: () => toast({ title: 'Failed to save budget', variant: 'destructive' }),
+  });
+
+  const handleSaveBudget = async (category_id: string) => {
+    const val = parseFloat(budgetInputs[category_id]);
+    if (!val || val <= 0) return;
+    setSavingId(category_id);
+    await upsertBudget.mutateAsync({ category_id, limit_amount: val });
+    setSavingId(null);
+    setBudgetInputs(prev => ({ ...prev, [category_id]: '' }));
+    setEditingId(null);
+  };
 
   const { data, isLoading } = useDashboardStats(currentMonth, currentYear);
 
@@ -239,41 +273,180 @@ const Index = () => {
 
         <div className="xl:col-span-2 rounded-xl border border-border bg-card p-5">
           <h2 className="font-display text-lg text-foreground mb-4">Budgets</h2>
-          <div className="space-y-4">
-            {data?.budgets?.map((budget: any) => {
-              const pct = Math.min((budget.spent / budget.limit_amount) * 100, 100);
-              const over = budget.spent >= budget.limit_amount;
-              const categoryName = budget.categories?.name || "Unknown";
+          
+          {(() => {
+            if (!data) return null;
+            
+            const mergedCategories = (data.categories || []).map((cat: any) => {
+              const budget = (data.budgets || []).find((b: any) => b.category_id === cat.id);
+              return { cat, budget };
+            });
+
+            const hasBudgets = (data.budgets || []).length > 0;
+
+            if (!hasBudgets) {
               return (
-                <div key={budget.id}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm text-foreground">{categoryName}</span>
-                    <span className="font-mono-dm text-xs text-muted-foreground">
-                      {budget.spent.toLocaleString()}{" "}
-                      <span className="text-muted-foreground/60">/ {budget.limit_amount.toLocaleString()} THB</span>
-                    </span>
+                <div className="space-y-4">
+                  <div className="flex flex-col items-center justify-center py-6">
+                    <PiggyBank className="h-8 w-8 text-muted-foreground mb-3" />
+                    <p className="text-sm text-muted-foreground text-center">No budgets set for this month</p>
+                    <p className="text-xs text-muted-foreground/60 text-center">Set a limit for any category below</p>
                   </div>
-                  <div className="h-2 w-full rounded-full bg-muted">
-                    <div
-                      className={`h-full rounded-full transition-all ${budgetBarColor(budget.spent, budget.limit_amount)}`}
-                      style={{ width: `${over ? 100 : pct}%` }}
-                    />
+                  <div className="space-y-4">
+                    {mergedCategories.map(({ cat }: any) => (
+                      <div key={cat.id} className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <span className="text-sm text-muted-foreground">{cat.name}</span>
+                          <div className="mt-1.5 h-2 w-full rounded-full border border-dashed border-border" />
+                        </div>
+                        <div className="ml-4 flex items-center gap-2 mt-4">
+                          <input
+                            type="number"
+                            placeholder="Set limit..."
+                            className="h-7 w-28 rounded-md border border-border bg-muted px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                            value={budgetInputs[cat.id] || ''}
+                            onChange={e => setBudgetInputs(prev => ({ ...prev, [cat.id]: e.target.value }))}
+                          />
+                          <button
+                            onClick={() => handleSaveBudget(cat.id)}
+                            disabled={savingId === cat.id}
+                            className="h-7 px-2 rounded-md bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
+                          >
+                            {savingId === cat.id ? '...' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  {over && (
-                    <p className="mt-1 text-[10px] font-medium text-expense">
-                      Over budget by {(budget.spent - budget.limit_amount).toLocaleString()} THB
-                    </p>
-                  )}
                 </div>
               );
-            })}
-            {(!data?.budgets || data.budgets.length === 0) && (
-              <p className="text-sm text-muted-foreground">No budgets set for this month</p>
-            )}
-          </div>
+            }
+
+            const onTrackCount = (data.budgets || []).filter((b: any) => (b.spent / b.limit_amount) < 0.8).length;
+            const totalCount = (data.budgets || []).length;
+            const anyOver = (data.budgets || []).some((b: any) => b.spent >= b.limit_amount);
+            const anyRisk = (data.budgets || []).some((b: any) => (b.spent / b.limit_amount) >= 0.8 && b.spent < b.limit_amount);
+            const dotColor = anyOver ? 'bg-expense' : anyRisk ? 'bg-amber' : 'bg-primary';
+
+            const totalLimit = (data.budgets || []).reduce((s: number, b: any) => s + Number(b.limit_amount), 0);
+            const totalSpent = (data.budgets || []).reduce((s: number, b: any) => s + b.spent, 0);
+            const totalRemaining = totalLimit - totalSpent;
+            const totalPct = totalLimit > 0 ? Math.min((totalSpent / totalLimit) * 100, 100) : 0;
+            const isTotalOver = totalSpent > totalLimit;
+
+            return (
+              <div className="space-y-4">
+                <div className="rounded-lg bg-muted/40 p-3 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Budget</span>
+                    <span className="font-mono-dm text-xs text-foreground">{totalSpent.toLocaleString()} / {totalLimit.toLocaleString()} THB</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-muted mb-2">
+                    <div 
+                      className={`h-full rounded-full transition-all ${budgetBarColor(totalSpent, totalLimit)}`}
+                      style={{ width: `${isTotalOver ? 100 : totalPct}%` }}
+                    />
+                  </div>
+                  {isTotalOver ? (
+                    <p className="text-xs text-expense font-medium">Over total budget by {Math.abs(totalRemaining).toLocaleString()} THB</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{totalRemaining.toLocaleString()} THB remaining this month</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 mb-4">
+                  <div className={`h-2 w-2 rounded-full ${dotColor}`} />
+                  <span className="text-xs text-muted-foreground">{onTrackCount} of {totalCount} categories on track</span>
+                </div>
+                
+                {mergedCategories.map(({ cat, budget }: any) => {
+                  if (budget) {
+                    const pct = Math.min((budget.spent / budget.limit_amount) * 100, 100);
+                    const over = budget.spent >= budget.limit_amount;
+                    const isEditing = editingId === cat.id;
+
+                    return (
+                      <div key={cat.id}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-foreground">{cat.name}</span>
+                            <button onClick={() => setEditingId(isEditing ? null : cat.id)} className="text-muted-foreground hover:text-foreground">
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <span className="font-mono-dm text-xs text-muted-foreground">
+                            {budget.spent.toLocaleString()}{" "}
+                            <span className="text-muted-foreground/60">/ {budget.limit_amount.toLocaleString()} THB</span>
+                          </span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-muted">
+                          <div
+                            className={`h-full rounded-full transition-all ${budgetBarColor(budget.spent, budget.limit_amount)}`}
+                            style={{ width: `${over ? 100 : pct}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          {over ? (
+                            <p className="text-[10px] font-medium text-expense">
+                              Over budget by {(budget.spent - budget.limit_amount).toLocaleString()} THB
+                            </p>
+                          ) : <div />}
+                          
+                          {isEditing && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                placeholder="New limit..."
+                                className="h-7 w-28 rounded-md border border-border bg-muted px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                value={budgetInputs[cat.id] || ''}
+                                onChange={e => setBudgetInputs(prev => ({ ...prev, [cat.id]: e.target.value }))}
+                              />
+                              <button
+                                onClick={() => handleSaveBudget(cat.id)}
+                                disabled={savingId === cat.id}
+                                className="h-7 px-2 rounded-md bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
+                              >
+                                {savingId === cat.id ? '...' : 'Save'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={cat.id} className="flex items-center justify-between mt-4">
+                      <div className="flex-1">
+                        <span className="text-sm text-muted-foreground">{cat.name}</span>
+                        <div className="mt-1.5 h-2 w-full rounded-full border border-dashed border-border" />
+                      </div>
+                      <div className="ml-4 flex items-center gap-2 mt-4">
+                        <input
+                          type="number"
+                          placeholder="Set limit..."
+                          className="h-7 w-28 rounded-md border border-border bg-muted px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={budgetInputs[cat.id] || ''}
+                          onChange={e => setBudgetInputs(prev => ({ ...prev, [cat.id]: e.target.value }))}
+                        />
+                        <button
+                          onClick={() => handleSaveBudget(cat.id)}
+                          disabled={savingId === cat.id}
+                          className="h-7 px-2 rounded-md bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
+                        >
+                          {savingId === cat.id ? '...' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           <Link
-            to="/settings"
-            className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            to="/budgets"
+            className="mt-6 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
           >
             Manage budgets <ArrowRight className="h-3 w-3" />
           </Link>

@@ -1,4 +1,4 @@
-import { DollarSign, LayoutDashboard, ArrowLeftRight, BarChart3, Settings, Send, LogOut, Moon } from "lucide-react";
+import { DollarSign, LayoutDashboard, ArrowLeftRight, BarChart3, Settings, Send, LogOut, Moon, Target } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -9,6 +9,7 @@ const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Transactions", url: "/transactions", icon: ArrowLeftRight },
   { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Budgets", url: "/budgets", icon: Target },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

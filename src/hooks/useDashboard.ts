@@ -30,6 +30,11 @@ export function useDashboardStats(month: number, year: number) {
         .eq('month', month)
         .eq('year', year);
 
+      const { data: categories } = await supabase
+        .from('categories')
+        .select('id, name, color, icon')
+        .eq('user_id', user.id);
+
       const income = transactions
         ?.filter(t => t.type === 'income')
         .reduce((sum, t) => sum + t.amount, 0) ?? 0;
@@ -51,6 +56,7 @@ export function useDashboardStats(month: number, year: number) {
         totalExpenses: expenses,
         recentTransactions: (transactions || []).slice(0, 5),
         budgets: budgetsWithSpent,
+        categories: categories || [],
         allTransactions: transactions || [],
       };
     },

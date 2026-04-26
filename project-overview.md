@@ -15,7 +15,7 @@ FinTrack AI is a modern, responsive personal finance tracking application design
 
 ## Recent Improvements
 
-The application recently underwent a massive functional overhaul to connect the user interface to a real database, transforming it from a static UI into a fully-functional web application. The improvements were implemented in three distinct phases:
+The application recently underwent a massive functional overhaul to connect the user interface to a real database, transforming it from a static UI into a fully-functional web application. The improvements were implemented in four distinct phases:
 
 ### Phase 1: Core Functionality (Forms & Mutations)
 *Replaced placeholder interactions with real database mutations.*
@@ -37,7 +37,14 @@ The application recently underwent a massive functional overhaul to connect the 
 - **Dark Mode**: Integrated a global dark mode toggle directly into the sidebar navigation. Preferences are saved to `localStorage` and persist across sessions.
 - **Recurring Transactions**: Updated the database schema and UI to support an optional `recurrence` marker (None, Weekly, Monthly, Yearly).
 - **Proactive Alerts**: Implemented dynamic toast notifications that pop up on the dashboard to warn users immediately when they are approaching (80%) or exceeding (100%) a specific category budget limit.
-- **Telegram Bot Integration**: Added functionality to the Settings page to generate a secure, 6-character link code for the Telegram bot. This code is saved directly into the `telegram_link_codes` Supabase table. To ensure the code "stays fixed" for the user, the app queries the database on load—if an active, unused code already exists, the app displays that fixed code rather than generating a new one.
+- **Telegram Bot Integration**: Added functionality to the Settings page to generate a secure, 6-character link code for the Telegram bot. This code is saved directly into the `telegram_link_codes` Supabase table with an automatic 15-minute `expires_at` expiration limit. The end-to-end flow is fully verified and working: generate code in the web app → send to the skills server bot → account is linked.
+
+### Phase 4: Budgets & Planning
+*Expanded the budgeting system into a fully-featured planning interface.*
+- **Dedicated Budgets Page**: Added a new `/budgets` route and sidebar entry. This page acts as a comprehensive planning hub, displaying all user categories, their budget limits, and actual spent amounts.
+- **Month Navigator**: Introduced a dynamic month navigator to browse and plan budgets for any past or future month (up to 12 months ahead). Past months are protected by a read-only state with an informational banner, ensuring historical records aren't accidentally modified.
+- **Total Budget Summary Blocks**: Integrated an aggregated summary block at the top of both the Budgets page and the Dashboard Budgets card. It displays total limits vs. total spent, remaining amounts, and a master color-coded progress bar.
+- **Dashboard Card Upgrades**: Re-engineered the dashboard Budgets card to merge available categories and existing budgets. It now features a summary tracking line (e.g., "X of Y categories on track" with a colored dot), supports an empty state with a PiggyBank icon, and allows inline budget setting and editing directly from the dashboard view.
 
 ---
 
