@@ -1,4 +1,4 @@
-import { DollarSign, LayoutDashboard, ArrowLeftRight, BarChart3, Settings, Send, LogOut, Moon, Target } from "lucide-react";
+import { DollarSign, LayoutDashboard, ArrowLeftRight, BarChart3, Settings, Send, LogOut, Moon, Target, X } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -13,7 +13,7 @@ const navItems = [
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
 
@@ -48,14 +48,22 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-card border-r border-border">
+    <aside
+      className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-card border-r border-border transition-transform duration-300 ease-in-out ${isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+    >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-6">
-        <img src="/logo.png" alt="FinTrack AI Logo" className="h-10 w-10 object-contain rounded-lg" />
-        <div>
-          <h1 className="font-display text-lg leading-tight text-foreground">FinTrack</h1>
-          <span className="font-mono-dm text-xs text-primary">AI Edition</span>
+      <div className="flex items-center justify-between px-5 py-6">
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="FinTrack AI Logo" className="h-10 w-10 object-contain rounded-lg" />
+          <div>
+            <h1 className="font-display text-lg leading-tight text-foreground">FinTrack</h1>
+            <span className="font-mono-dm text-xs text-primary">AI Edition</span>
+          </div>
         </div>
+        <button className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted" onClick={onClose}>
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -68,6 +76,9 @@ export function AppSidebar() {
                 end={item.url === "/"}
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 activeClassName="!bg-primary !text-primary-foreground"
+                onClick={() => {
+                  if (window.innerWidth < 1024 && onClose) onClose();
+                }}
               >
                 <item.icon className="h-4 w-4" />
                 <span>{item.title}</span>
@@ -78,7 +89,7 @@ export function AppSidebar() {
       </nav>
 
       {/* Telegram Status */}
-      <div className="mx-3 mb-3 rounded-lg border border-border bg-muted p-3">
+      {/* <div className="mx-3 mb-3 rounded-lg border border-border bg-muted p-3">
         <div className="flex items-center gap-2 mb-2">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full rounded-full bg-amber animate-pulse-dot" />
@@ -89,7 +100,7 @@ export function AppSidebar() {
           <Send className="h-3 w-3" />
           Connect Sync
         </button>
-      </div>
+      </div> */}
 
       {/* User Profile */}
       <div className="flex items-center gap-3 border-t border-border px-4 py-4">

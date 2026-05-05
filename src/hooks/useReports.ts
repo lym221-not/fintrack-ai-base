@@ -22,6 +22,25 @@ export function useReportData(month: number, year: number) {
 
       if (error) throw error;
 
+      // Fetch previous month
+      const prevMonth = month === 1 ? 12 : month - 1;
+      const prevYear = month === 1 ? year - 1 : year;
+      const prevMonthStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
+      const prevLastDay = new Date(prevYear, prevMonth, 0).getDate();
+      const prevMonthEnd = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(prevLastDay).padStart(2, '0')}`;
+
+      const { data: prevData } = await supabase
+        .from('transactions')
+        .select('amount, type')
+        .eq('user_id', user.id)
+        .gte('date', prevMonthStart)
+        .lte('date', prevMonthEnd);
+
+      const curExpense = (data || []).filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+      const curIncome = (data || []).filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+      const prevExpense = (prevData || []).filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+      const prevIncome = (prevData || []).filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+
       // Group by category for pie/bar chart
       const byCategory = (data || []).reduce((acc: Record<string, { value: number; color: string }>, t: any) => {
         if (t.type !== 'expense') return acc; // Only expenses typically in this breakdown
@@ -42,7 +61,30 @@ export function useReportData(month: number, year: number) {
         color
       })).sort((a, b) => b.value - a.value);
 
-      return { categoryData, rawTransactions: data || [] };
+      const insights = [];
+      if (categoryData.length > 0) {
+        insights.push(`Your biggest expense category is ${categoryData[0].name}.`);
+      }
+      
+      const savedCur = curIncome - curExpense;
+      const savedPrev = prevIncome - prevExpense;
+      if (savedCur > savedPrev) {
+        insights.push(`You saved ${(savedCur - savedPrev).toLocaleString()} THB more than last month.`);
+      } else if (savedPrev > savedCur) {
+        insights.push(`You saved ${(savedPrev - savedCur).toLocaleString()} THB less than last month.`);
+      }
+
+      const comparisonData = [
+        { name: 'Last Month', Income: prevIncome, Expense: prevExpense },
+        { name: 'This Month', Income: curIncome, Expense: curExpense },
+      ];
+
+      return { 
+        categoryData, 
+        rawTransactions: data || [], 
+        insights, 
+        comparisonData 
+      };
     },
   });
 }

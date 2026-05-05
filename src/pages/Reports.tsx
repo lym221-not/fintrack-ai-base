@@ -32,6 +32,27 @@ const Reports = () => {
 
   const hasData = data?.categoryData && data.categoryData.length > 0;
 
+  const exportCSV = () => {
+    if (!data?.rawTransactions) return;
+    
+    const headers = ['Date', 'Description', 'Type', 'Amount'];
+    const rows = data.rawTransactions.map((t: any) => [
+      t.date,
+      `"${(t.description || '').replace(/"/g, '""')}"`,
+      t.type,
+      t.amount
+    ]);
+
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `report_${year}_${month}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between mb-8 gap-4">
@@ -64,8 +85,23 @@ const Reports = () => {
               ))}
             </SelectContent>
           </Select>
+
+          <button onClick={exportCSV} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors h-10">
+            Export CSV
+          </button>
         </div>
       </div>
+
+      {data?.insights && data.insights.length > 0 && (
+        <div className="mb-6 rounded-xl border border-border bg-card p-4">
+          <h3 className="font-display text-base mb-2">Insights</h3>
+          <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+            {data.insights.map((insight: string, i: number) => (
+              <li key={i}>{insight}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {!hasData ? (
         <Card className="p-12 flex flex-col items-center justify-center text-center">
@@ -93,7 +129,7 @@ const Reports = () => {
                     paddingAngle={2}
                     dataKey="value"
                   >
-                    {data.categoryData.map((entry, index) => (
+                    {data.categoryData.map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -107,7 +143,7 @@ const Reports = () => {
             
             {/* Custom Legend */}
             <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {data.categoryData.map((entry, i) => (
+              {data.categoryData.map((entry: any, i: number) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
                   <span className="text-sm truncate text-muted-foreground">{entry.name}</span>
@@ -116,12 +152,12 @@ const Reports = () => {
             </div>
           </Card>
 
-          {/* Bar Chart */}
+          {/* Monthly Comparison Bar Chart */}
           <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-6">Spending Breakdown</h2>
+            <h2 className="text-lg font-semibold mb-6">Monthly Comparison</h2>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.categoryData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <BarChart data={data?.comparisonData || []} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} tickFormatter={(val) => `${val}`} />
@@ -130,11 +166,8 @@ const Reports = () => {
                     contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--card)' }}
                     cursor={{ fill: 'var(--muted)' }}
                   />
-                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                    {data.categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
+                  <Bar dataKey="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Expense" fill="#f43f5e" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

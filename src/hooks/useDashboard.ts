@@ -43,6 +43,30 @@ export function useDashboardStats(month: number, year: number) {
         ?.filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + t.amount, 0) ?? 0;
 
+      const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
+
+      // Calculate Category Expenses for Pie Chart
+      const categoryTotals: Record<string, number> = {};
+      transactions?.filter(t => t.type === 'expense').forEach(t => {
+        const catName = t.categories?.name || 'Other';
+        categoryTotals[catName] = (categoryTotals[catName] || 0) + t.amount;
+      });
+      const categoryExpenses = Object.entries(categoryTotals)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+
+      const topCategory = categoryExpenses.length > 0 ? categoryExpenses[0].name : 'N/A';
+
+      // Calculate Daily Expenses for Line Chart
+      const dailyTotals: Record<string, number> = {};
+      transactions?.filter(t => t.type === 'expense').forEach(t => {
+        const dateStr = new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + t.amount;
+      });
+      const dailyExpenses = Object.entries(dailyTotals)
+        .map(([date, amount]) => ({ date, amount }))
+        .reverse(); // Reverse so older dates are first if they were ordered desc
+
       const budgetsWithSpent = (budgets || []).map((budget: Budget) => ({
         ...budget,
         spent: (transactions || [])
@@ -54,6 +78,10 @@ export function useDashboardStats(month: number, year: number) {
         totalBalance: income - expenses,
         totalIncome: income,
         totalExpenses: expenses,
+        savingsRate,
+        topCategory,
+        categoryExpenses,
+        dailyExpenses,
         recentTransactions: (transactions || []).slice(0, 5),
         budgets: budgetsWithSpent,
         categories: categories || [],

@@ -21,6 +21,9 @@ import { useDashboardStats } from "@/hooks/useDashboard";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+
+const COLORS = ['#8b5cf6', '#0ea5e9', '#f59e0b', '#ec4899', '#10b981', '#f43f5e', '#84cc16'];
 
 /* ── Category Meta ── */
 const categoryMeta: Record<string, { icon: React.ElementType; bg: string; text: string }> = {
@@ -125,6 +128,22 @@ const Index = () => {
       accent: false,
       icon: TrendingDown
     },
+    {
+      label: "Savings Rate",
+      value: `${data?.savingsRate?.toFixed(1) ?? "0"}%`,
+      trend: "",
+      positive: (data?.savingsRate ?? 0) > 20,
+      accent: false,
+      icon: PiggyBank
+    },
+    {
+      label: "Top Category",
+      value: data?.topCategory ?? "N/A",
+      trend: "",
+      positive: false,
+      accent: false,
+      icon: ShoppingBag
+    },
   ];
 
   const currentMonthLabel = new Date(currentYear, currentMonth - 1).toLocaleString('default', {
@@ -185,13 +204,13 @@ const Index = () => {
       </p>
       <h1 className="font-display text-3xl text-foreground mb-8">Overview</h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         {stats.map((s) => (
           <div
             key={s.label}
             className={`relative rounded-xl border bg-card p-5 transition-colors ${s.accent
-                ? "border-primary/40 shadow-[0_0_24px_-6px_hsl(var(--primary)/0.15)]"
-                : "border-border"
+              ? "border-primary/40 shadow-[0_0_24px_-6px_hsl(var(--primary)/0.15)]"
+              : "border-border"
               }`}
           >
             <div className="flex items-center justify-between mb-3">
@@ -201,24 +220,105 @@ const Index = () => {
               <s.icon className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="font-mono-dm text-[28px] leading-none font-medium text-foreground">
+              <span className="font-mono-dm text-[24px] leading-none font-medium text-foreground">
                 {s.value}
               </span>
-              <span className="text-xs text-muted-foreground">THB</span>
-            </div>
-            <div className="mt-2 flex items-center gap-1">
-              {s.positive ? (
-                <ArrowUpRight className="h-3 w-3 text-income" />
-              ) : (
-                <ArrowDownRight className="h-3 w-3 text-expense" />
+              {s.label !== "Savings Rate" && s.label !== "Top Category" && (
+                <span className="text-xs text-muted-foreground">THB</span>
               )}
-              <span className={`font-mono-dm text-xs font-medium ${s.positive ? "text-income" : "text-expense"}`}>
-                {s.trend}
-              </span>
-              <span className="text-[10px] text-muted-foreground ml-1">vs last month</span>
             </div>
+            {s.trend && (
+              <div className="mt-2 flex items-center gap-1">
+                {s.positive ? (
+                  <ArrowUpRight className="h-3 w-3 text-income" />
+                ) : (
+                  <ArrowDownRight className="h-3 w-3 text-expense" />
+                )}
+                <span className={`font-mono-dm text-xs font-medium ${s.positive ? "text-income" : "text-expense"}`}>
+                  {s.trend}
+                </span>
+                <span className="text-[10px] text-muted-foreground ml-1">vs last month</span>
+              </div>
+            )}
           </div>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+        {/* Daily Spending Chart */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="font-display text-lg text-foreground mb-4">Daily Spending</h2>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data?.dailyExpenses || []}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                  itemStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Line type="monotone" dataKey="amount" stroke="#f43f5e" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Category Spending Pie Chart */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="font-display text-lg text-foreground mb-4">Category Breakdown</h2>
+          <div className="h-[250px] w-full">
+            {data?.categoryExpenses && data.categoryExpenses.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={data.categoryExpenses}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {data.categoryExpenses.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                    itemStyle={{ color: 'hsl(var(--foreground))' }}
+                  />
+                  <Legend verticalAlign="bottom" height={36} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                No expense data for this month
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Income vs Expense Bar Chart */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="font-display text-lg text-foreground mb-4">Income vs Expense</h2>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={[{ name: 'This Month', income: data?.totalIncome || 0, expense: data?.totalExpenses || 0 }]}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                  itemStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Legend verticalAlign="bottom" height={36} />
+                <Bar dataKey="income" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" name="Expense" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 mb-8">
@@ -273,10 +373,10 @@ const Index = () => {
 
         <div className="xl:col-span-2 rounded-xl border border-border bg-card p-5">
           <h2 className="font-display text-lg text-foreground mb-4">Budgets</h2>
-          
+
           {(() => {
             if (!data) return null;
-            
+
             const mergedCategories = (data.categories || []).map((cat: any) => {
               const budget = (data.budgets || []).find((b: any) => b.category_id === cat.id);
               return { cat, budget };
@@ -342,7 +442,7 @@ const Index = () => {
                     <span className="font-mono-dm text-xs text-foreground">{totalSpent.toLocaleString()} / {totalLimit.toLocaleString()} THB</span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-muted mb-2">
-                    <div 
+                    <div
                       className={`h-full rounded-full transition-all ${budgetBarColor(totalSpent, totalLimit)}`}
                       style={{ width: `${isTotalOver ? 100 : totalPct}%` }}
                     />
@@ -358,7 +458,7 @@ const Index = () => {
                   <div className={`h-2 w-2 rounded-full ${dotColor}`} />
                   <span className="text-xs text-muted-foreground">{onTrackCount} of {totalCount} categories on track</span>
                 </div>
-                
+
                 {mergedCategories.map(({ cat, budget }: any) => {
                   if (budget) {
                     const pct = Math.min((budget.spent / budget.limit_amount) * 100, 100);
@@ -391,7 +491,7 @@ const Index = () => {
                               Over budget by {(budget.spent - budget.limit_amount).toLocaleString()} THB
                             </p>
                           ) : <div />}
-                          
+
                           {isEditing && (
                             <div className="flex items-center gap-2">
                               <input
@@ -453,7 +553,7 @@ const Index = () => {
         </div>
       </div>
 
-      <div className="rounded-xl border border-blue/20 bg-blue/5 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+      {/* <div className="rounded-xl border border-blue/20 bg-blue/5 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue/20">
           <Send className="h-5 w-5 text-blue" />
         </div>
@@ -466,7 +566,7 @@ const Index = () => {
         <button className="rounded-lg bg-blue px-5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-blue/80">
           Connect
         </button>
-      </div>
+      </div> */}
     </div>
   );
 };

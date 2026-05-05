@@ -20,15 +20,17 @@ import {
   useCategoriesQuery
 } from "@/hooks/useTransactions";
 
-const categoryColors: Record<string, { bg: string; text: string }> = {
-  Food: { bg: "bg-orange-500", text: "text-orange-400" },
-  Transport: { bg: "bg-blue-500", text: "text-blue-400" },
-  Shopping: { bg: "bg-purple-500", text: "text-purple-400" },
-  Health: { bg: "bg-rose-500", text: "text-rose-400" },
-  Income: { bg: "bg-primary", text: "text-primary" },
-  Rent: { bg: "bg-yellow-500", text: "text-yellow-400" },
-  Travel: { bg: "bg-cyan-500", text: "text-cyan-400" },
-  Other: { bg: "bg-gray-500", text: "text-gray-400" },
+import { UtensilsCrossed, Briefcase, Car, ShoppingBag, Heart, Wallet, Copy } from "lucide-react";
+
+const categoryMeta: Record<string, { icon: React.ElementType; bg: string; text: string }> = {
+  Food: { icon: UtensilsCrossed, bg: "bg-orange-500/20", text: "text-orange-400" },
+  Income: { icon: Briefcase, bg: "bg-primary/20", text: "text-primary" },
+  Transport: { icon: Car, bg: "bg-blue/20", text: "text-blue" },
+  Shopping: { icon: ShoppingBag, bg: "bg-purple-500/20", text: "text-purple-400" },
+  Health: { icon: Heart, bg: "bg-rose-500/20", text: "text-rose-400" },
+  Rent: { icon: Briefcase, bg: "bg-yellow-500/20", text: "text-yellow-400" },
+  Travel: { icon: Car, bg: "bg-cyan-500/20", text: "text-cyan-400" },
+  Other: { icon: Wallet, bg: "bg-muted", text: "text-muted-foreground" },
 };
 
 type TypeFilter = "all" | "income" | "expense";
@@ -134,6 +136,19 @@ const Transactions = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleDuplicate = (tx: any) => {
+    reset({
+      type: tx.type,
+      date: new Date().toISOString().split('T')[0],
+      amount: tx.amount,
+      description: tx.description,
+      category_id: tx.category_id,
+      recurrence: tx.recurrence || "none",
+    });
+    setEditingId(null);
+    setModalOpen(true);
+  };
+
   const allCategories = useMemo(() => ["All", ...categories.map(c => c.name)], [categories]);
   const net = transactions.reduce((s, tx) => tx.type === 'income' ? s + tx.amount : s - tx.amount, 0);
 
@@ -143,8 +158,14 @@ const Transactions = () => {
     { label: "Expense", value: "expense" },
   ];
 
-  const formatDate = (iso: string) => {
+  const formatDateLabel = (iso: string) => {
     const d = new Date(iso);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (d.toDateString() === today.toDateString()) return "Today";
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
@@ -383,15 +404,16 @@ const Transactions = () => {
           <div className="divide-y divide-border">
             {transactions.map((tx) => {
               const categoryName = tx.categories?.name || "Other";
-              const meta = categoryColors[categoryName] || categoryColors.Other;
+              const meta = categoryMeta[categoryName] || categoryMeta.Other;
+              const Icon = meta.icon;
               const isIncome = tx.type === "income";
               return (
                 <div
                   key={tx.id}
                   className="group flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-muted/30"
                 >
-                  <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white", meta.bg)}>
-                    {categoryName[0]}
+                  <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", meta.bg)}>
+                    <Icon className={cn("h-4 w-4", meta.text)} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate flex items-center gap-2">
@@ -405,7 +427,7 @@ const Transactions = () => {
                     <p className="text-[11px]">
                       <span className={meta.text}>{categoryName}</span>
                       <span className="text-muted-foreground"> · </span>
-                      <span className="font-mono-dm text-muted-foreground">{formatDate(tx.date)}</span>
+                      <span className="font-mono-dm text-muted-foreground">{formatDateLabel(tx.date)}</span>
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -415,13 +437,22 @@ const Transactions = () => {
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
                         className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted"
+                        onClick={() => handleDuplicate(tx)}
+                        title="Duplicate"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                      <button 
+                        className="rounded p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted"
                         onClick={() => handleEdit(tx)}
+                        title="Edit"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button 
                         className="rounded p-1.5 text-muted-foreground hover:text-expense hover:bg-muted"
                         onClick={() => handleDelete(tx.id)}
+                        title="Delete"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

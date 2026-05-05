@@ -10,6 +10,8 @@ import { useNavigate } from "react-router-dom";
 const Settings = () => {
   const [generatedCode, setGeneratedCode] = useState<string>("");
   const [showCode, setShowCode] = useState<boolean>(false);
+  const [telegramId, setTelegramId] = useState<string | null>(null);
+  const [expiresIn, setExpiresIn] = useState<number | null>(null);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -24,23 +26,38 @@ const Settings = () => {
       if (user) {
         setEmail(user.email || "");
         setName(user.user_metadata?.display_name || "");
+
+        // Fetch profile
+        const { data: users } = await supabase.from('users').select('telegram_id').eq('id', user.id).single();
+        if (users?.telegram_id) {
+          setTelegramId(users.telegram_id);
+        }
+
         // Fetch active telegram link code
         const { data: codes } = await supabase
           .from('telegram_link_codes')
-          .select('code')
+          .select('code, expires_at')
           .eq('user_id', user.id)
           .eq('used', false)
           .gt('expires_at', new Date().toISOString())
           .order('created_at', { ascending: false })
           .limit(1);
-          
+
         if (codes && codes.length > 0) {
           setGeneratedCode(codes[0].code);
           setShowCode(true);
+          const exp = new Date(codes[0].expires_at).getTime();
+          const now = new Date().getTime();
+          setExpiresIn(Math.max(0, Math.floor((exp - now) / 1000)));
         }
       }
     };
     fetchUser();
+
+    const interval = setInterval(() => {
+      setExpiresIn(prev => (prev && prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const generateCode = async () => {
@@ -49,7 +66,10 @@ const Settings = () => {
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    
+
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
@@ -59,10 +79,11 @@ const Settings = () => {
         .insert({
           user_id: user.id,
           code: code,
+          expires_at: expiresAt.toISOString()
         });
 
       if (error) throw error;
-      
+
       setGeneratedCode(code);
       setShowCode(true);
       toast({
@@ -206,10 +227,22 @@ const Settings = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-amber animate-pulse-dot" />
-              </span>
-              <span className="text-amber text-xs">Not connected</span>
+              {telegramId ? (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-income" />
+                  </span>
+                  <span className="text-income text-xs font-medium">Connected</span>
+                  <span className="text-muted-foreground text-xs font-mono-dm ml-2">(ID: {telegramId})</span>
+                </>
+              ) : (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-amber animate-pulse-dot" />
+                  </span>
+                  <span className="text-amber text-xs">Not connected</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -240,26 +273,37 @@ const Settings = () => {
               Generate Code
             </Button>
           ) : (
-            <div className="flex gap-2">
-              <div className="bg-card border border-primary/30 rounded-lg px-4 py-2.5 flex-1">
-                <div className="font-mono-dm text-primary text-lg tracking-widest text-center">
-                  {generatedCode}
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <div className="bg-card border border-primary/30 rounded-lg px-4 py-2.5 flex-1 flex flex-col items-center justify-center">
+                  <div className="font-mono-dm text-primary text-lg tracking-widest text-center">
+                    {generatedCode}
+                  </div>
                 </div>
+                <Button
+                  onClick={copyToClipboard}
+                  variant="outline"
+                  className="px-4 py-2 h-auto"
+                >
+                  Copy
+                </Button>
               </div>
-              <Button
-                onClick={copyToClipboard}
-                variant="outline"
-                className="px-4 py-2"
-              >
-                Copy
-              </Button>
-              <Button
-                onClick={generateCode}
-                variant="outline"
-                className="px-4 py-2 border-amber/30 text-amber hover:bg-amber/10"
-              >
-                Reset
-              </Button>
+              {expiresIn !== null && expiresIn > 0 ? (
+                <div className="text-xs text-center text-muted-foreground">
+                  Code expires in {Math.floor(expiresIn / 60)}:{(expiresIn % 60).toString().padStart(2, '0')}
+                </div>
+              ) : (
+                <div className="text-xs text-center text-expense">Code expired</div>
+              )}
+              {(!expiresIn || expiresIn <= 0) && (
+                <Button
+                  onClick={generateCode}
+                  variant="outline"
+                  className="w-full mt-2 border-amber/30 text-amber hover:bg-amber/10"
+                >
+                  Generate New Code
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
