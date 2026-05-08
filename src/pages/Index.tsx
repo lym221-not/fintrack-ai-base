@@ -107,7 +107,7 @@ const Index = () => {
     {
       label: "Current Balance",
       value: data?.totalBalance?.toLocaleString() ?? "0",
-      trend: "+0.0%",
+      trend: "",
       positive: (data?.totalBalance ?? 0) >= 0,
       accent: true,
       icon: Wallet

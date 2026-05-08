@@ -35,6 +35,20 @@ export function useDashboardStats(month: number, year: number) {
         .select('id, name, color, icon')
         .eq('user_id', user.id);
 
+      // Fetch all transactions to calculate lifetime balance
+      const { data: allTx } = await supabase
+        .from('transactions')
+        .select('amount, type')
+        .eq('user_id', user.id);
+
+      const lifetimeIncome = allTx
+        ?.filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0) ?? 0;
+
+      const lifetimeExpenses = allTx
+        ?.filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0) ?? 0;
+
       const income = transactions
         ?.filter(t => t.type === 'income')
         .reduce((sum, t) => sum + t.amount, 0) ?? 0;
@@ -75,7 +89,7 @@ export function useDashboardStats(month: number, year: number) {
       }));
 
       return {
-        totalBalance: income - expenses,
+        totalBalance: lifetimeIncome - lifetimeExpenses,
         totalIncome: income,
         totalExpenses: expenses,
         savingsRate,
